@@ -27,6 +27,7 @@ import tensorflow as tf
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import rnn_cell_impl
+from keras import backend as K
 
 # to pass to py_func
 def np_eigenvals(x):
@@ -123,9 +124,13 @@ class EchoStateRNNCell(rnn_cell_impl.RNNCell):
         """ Echo-state RNN: 
             x = x + h*(f(W*inp + U*g(x)) - x). 
         """
+        # print("Input shape", inputs.shape)
+        # print("W:", self.W.shape, "sw:", self.sw.shape)
         
         new_state = state + self.decay*(
                 self._activation(
+#                       K.batch_dot(inputs, self.W*self.sw, axes=[2, 0])+
+#                       K.batch_dot(self._activation(state), self.U * self.rho_one * self.rho, axes=[2, 0]) 
                     tf.matmul(inputs, self.W * self.sw) +
                     tf.matmul(self._activation(state), self.U * self.rho_one * self.rho)      
                     )
@@ -137,7 +142,7 @@ class EchoStateRNNCell(rnn_cell_impl.RNNCell):
         return output, new_state   
          
     def setEchoStateProperty(self):
-        """ optimize U to obtain alpha-improoved echo-state property """
+        """ optimize U to obtain alpha-improved echo-state property """
 
         self.U = self.set_alpha(self.U)
         self.U = self.normalizeEchoStateWeights(self.U)
