@@ -228,8 +228,10 @@ with tf.Session(graph=static_graph) as sess:
 if hvd.rank() == 0:
     print('\tTest Loss: {:.10f}, Test Acc: {:.3f}'.format(loss_test, acc_test))
     
-# print(losses)
-plt.plot(range(len(losses)), losses)
-plt.title("Loss over iterations (np= {}, rt= {:2f})".format(hvd.size(), runtime))
-plt.savefig("losses_itr.png")
-#plt.show()
+    # print(losses)
+    plt.plot(range(len(losses)), losses)
+    plt.title("Loss over iterations (np= {}, rt= {:2f})".format(hvd.size(), runtime))
+    plt.xlabel("Iterations")
+    plt.ylabel("Loss")
+    plt.savefig("./plots/losses_itr.(np= {}, rt= {:2f}).png".format(hvd.size(), runtime))
+    #plt.show()
