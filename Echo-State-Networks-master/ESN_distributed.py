@@ -6,6 +6,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import math_ops
 from ESN import EchoStateRNNCell
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from time import time
 import horovod.tensorflow as hvd
@@ -28,8 +30,10 @@ if False:
 
 # Pin GPU to be used to process local rank (one GPU per process)
 # takes only current needed GPU memory
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
+config = tf.ConfigProto(
+      intra_op_parallelism_threads=hvd.size(),
+      inter_op_parallelism_threads=hvd.size())
+config.gpu_options.allow_growth = False
 config.gpu_options.visible_device_list = str(hvd.local_rank())
 
 
