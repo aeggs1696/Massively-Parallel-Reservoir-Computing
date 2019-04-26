@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[73]:
-
 
 import numpy as np
 import tensorflow as tf
@@ -41,17 +39,10 @@ random_seed = 1
 # rng = np.random.RandomState(random_seed)
 
 
-# In[74]:
-
 
 # flatten training shape
 (N, Ni, Nj) = X_train.shape
 (N_test, _, _) = X_test.shape
-
-
-# In[75]:
-
-
 
 # x_train = x_train.reshape([N, Ni*Nj])
 # x_test = x_test.reshape([x_test.shape[0], Ni*Nj])
@@ -64,13 +55,8 @@ print(y_train[0])
 # We define a simple simulation with a single batch. A timeseries of 'n_steps' timesteps is run. The input is a inpulse 
 # given in the first timestep consisting of a gaussian noise given to each unit.
 
-# In[79]:
-
 
 # Global variables
-
-# num_units = 20
-
 
 # hyperparameters
 n_neurons = 100
@@ -86,23 +72,10 @@ n_outputs = 10 # 10 classes
 
 rnn_inputs = np.zeros((batch_size, n_steps, n_inputs), dtype="float32")
 rnn_inputs[:,:,:] = X_train[(0),:,:]
-# rnn_inputs[0, :, 0] = np.sin(np.linspace(0,18*np.pi, stime)) + \
-#                       np.sin(np.linspace(0,5.3*np.pi, stime)) + \
-#                       np.sin(np.linspace(0,2.1*np.pi, stime)) 
-
-# plt.imshow(rnn_inputs[0,:,:])
-# plt.show()
-# plt.imshow(rnn_inputs[1,:,:])
-# plt.show()
-
 activation = lambda x: math_ops.tanh(x)
 
 
 # Implementing a static graph without tensorflow API:
-
-# In[80]:
-
-
 
 # Build model...
 tf.reset_default_graph()
@@ -118,10 +91,11 @@ with static_graph.as_default() as g:
     rng = np.random.RandomState(random_seed)
 
     # Init the ESN cell
-    rand_input = np.random.rand(1, n_neurons)
-    rnn_batch_init_state = np.broadcast_to(rand_input, (batch_size, n_neurons))
-    rnn_test_init_state = np.broadcast_to(rand_input, (N_test, n_neurons))
-    rnn_train_init_state = np.broadcast_to(rand_input, (N, n_neurons))
+    # rand_input = np.random.rand(1, n_neurons)
+    zero_input = np.zeros(1, n_neurons)
+    rnn_batch_init_state = np.broadcast_to(zero_input, (batch_size, n_neurons))
+    rnn_test_init_state = np.broadcast_to(zero_input, (N_test, n_neurons))
+    rnn_train_init_state = np.broadcast_to(zero_input, (N, n_neurons))
     cell = EchoStateRNNCell(num_units=n_neurons, 
                             num_inputs=n_inputs,
                             activation=activation, 
@@ -196,29 +170,9 @@ with static_graph.as_default() as g:
     # # initialize the variables
     init = tf.global_variables_initializer()
     
-    
-# tf.matmul
-# Input shape(1, 28)
-# W: (28, 28) ()
-# state.shape (?, 28)
-# outputs.shape (?, 784)
-
-# K.batch_mul
-# (1, 28)
-# (28, 28) ()
-# state.shape (28, 28)
-# outputs.shape (28, 784)
-
-
-# In[ ]:
-
-
-
-
 
 # Implementing a dynamic graph using tensorflow API
 
-# In[81]:
 
 
 losses = []
@@ -264,17 +218,5 @@ print('\tTest Loss: {:.10f}, Test Acc: {:.3f}'.format(loss_test, acc_test))
     
 # print(losses)
 plt.plot(range(len(losses)), losses)
-plt.show()
-# 
-
-# In[35]:
-
-
-# print(y_train[:5000])
-
-
-# In[ ]:
-
-
-
-
+plt.savefig("losses_itr.png")
+#plt.show()
