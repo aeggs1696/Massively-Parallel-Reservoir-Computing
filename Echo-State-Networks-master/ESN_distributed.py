@@ -46,9 +46,12 @@ random_seed = 1
 
 # x_train = x_train.reshape([N, Ni*Nj])
 # x_test = x_test.reshape([x_test.shape[0], Ni*Nj])
-print("MNIST shape", X_train.shape, X_test.shape)
+if hvd.rank() == 0:
+    print("MNIST shape", X_train.shape, X_test.shape)
+    print("Size: {}".format(hvd.size()))
 
-plt.imshow(X_train[0].reshape([Ni,Nj]))
+
+#plt.imshow(X_train[0].reshape([Ni,Nj]))
 print(y_train[0])
 
 
@@ -62,7 +65,8 @@ print(y_train[0])
 n_neurons = 100
 learning_rate_ = 1e-3
 batch_size = 128
-n_epochs = 1
+n_epochs = 4.0
+n_epochs = int(np.ceil(n_epochs / hvd.size()))
 
 # parameters
 n_steps = 28 # 28 rows aka Ni
@@ -92,10 +96,10 @@ with static_graph.as_default() as g:
 
     # Init the ESN cell
     # rand_input = np.random.rand(1, n_neurons)
-    zero_input = np.zeros(1, n_neurons)
-    rnn_batch_init_state = np.broadcast_to(zero_input, (batch_size, n_neurons))
-    rnn_test_init_state = np.broadcast_to(zero_input, (N_test, n_neurons))
-    rnn_train_init_state = np.broadcast_to(zero_input, (N, n_neurons))
+    zero_input = np.zeros([1, n_neurons])
+    rnn_batch_init_state = np.broadcast_to(zero_input, [batch_size, n_neurons])
+    rnn_test_init_state = np.broadcast_to(zero_input, [N_test, n_neurons])
+    rnn_train_init_state = np.broadcast_to(zero_input, [N, n_neurons])
     cell = EchoStateRNNCell(num_units=n_neurons, 
                             num_inputs=n_inputs,
                             activation=activation, 
@@ -156,12 +160,14 @@ with static_graph.as_default() as g:
     accuracy = tf.reduce_mean(tf.cast(prediction, tf.float32))
     
 
+    global_step = tf.train.get_or_create_global_step()
+
     # Add hook to broadcast variables from rank 0 to all other processes during
     # initialization.
     hooks = [hvd.BroadcastGlobalVariablesHook(0)]
 
     # Make training operation
-    train_op = opt.minimize(loss)
+    train_op = opt.minimize(loss, global_step=tf.train.get_or_create_global_step())
 
     
     # Save checkpoints only on worker 0 to prevent other workers from corrupting them.
@@ -174,7 +180,8 @@ with static_graph.as_default() as g:
 # Implementing a dynamic graph using tensorflow API
 
 
-
+stime = time()
+runtime = 0
 losses = []
 # train the model
 with tf.Session(graph=static_graph) as sess:
@@ -183,17 +190,18 @@ with tf.Session(graph=static_graph) as sess:
 # The MonitoredTrainingSession takes care of session initialization,
 # restoring from a checkpoint, saving to a checkpoint, and closing when done
 # or an error occurs.
-# with tf.train.MonitoredTrainingSession(checkpoint_dir=checkpoint_dir,
-#                                        config=config,
-#                                        hooks=hooks) as sess:#mon_sess:
+#with tf.train.MonitoredTrainingSession(checkpoint_dir=checkpoint_dir,
+#                                       config=config,
+#                                       hooks=hooks) as sess:#mon_sess:
     
-#     while not sess.should_stop():
+#    while not sess.should_stop():
         # Perform synchronous training.
 
     sess.run(init)
     n_batches = N // batch_size
 #     print(n_batches)
     for epoch in range(n_epochs):
+        batch_start = time()
         permutation = np.random.permutation(N)
 #         print(permutation[0:1])
         for i, batch in enumerate(range(n_batches)):
@@ -209,14 +217,19 @@ with tf.Session(graph=static_graph) as sess:
         loss_train, acc_train = sess.run([loss, accuracy], feed_dict={inputs: X_train[:1000], y: y_train[:1000], 
                                                                       init_state: rnn_train_init_state[:1000]})
         
-        print('Epoch {}/{}:\n\tTrain Loss: {:.10f}, Train Acc: {:.3f}'.format(
-            epoch + 1, n_epochs, loss_train, acc_train))
-        
-    loss_test, acc_test = sess.run(
+        if hvd.rank() == 0:
+            runtime += time() - batch_start
+            print('Epoch {}/{}:\n\tTrain Loss: {:.10f}, Train Acc: {:.3f}'.format(
+                epoch + 1, n_epochs, loss_train, acc_train))
+            print("\tRuntime: {:.2f}s, ({:.2f} per epoch".format(runtime, (runtime)/(float(epoch)+1)))
+    if hvd.rank() == 0:
+        loss_test, acc_test = sess.run(
                 [loss, accuracy], feed_dict={inputs: X_test, y: y_test, init_state: rnn_test_init_state})
-print('\tTest Loss: {:.10f}, Test Acc: {:.3f}'.format(loss_test, acc_test))
+if hvd.rank() == 0:
+    print('\tTest Loss: {:.10f}, Test Acc: {:.3f}'.format(loss_test, acc_test))
     
 # print(losses)
 plt.plot(range(len(losses)), losses)
+plt.title("Loss over iterations (np= {}, rt= {:2f})".format(hvd.size(), runtime))
 plt.savefig("losses_itr.png")
 #plt.show()
