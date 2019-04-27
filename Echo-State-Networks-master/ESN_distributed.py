@@ -20,6 +20,9 @@ mnist = tf.keras.datasets.mnist
 (X_train, y_train), (X_test, y_test) = mnist.load_data()
 X_train, X_test = X_train / 255.0, X_test / 255.0
 
+X_train, y_train = X_train[hvd.rank()::hvd.size()], y_train[hvd.rank()::hvd.size()]
+
+
 print("MNIST shape", X_train.shape, X_test.shape)
 
 if False:
@@ -66,11 +69,12 @@ print(y_train[0])
 # Global variables
 
 # hyperparameters
-n_neurons = 100
+n_neurons = 256
 learning_rate_ = 1e-3
 batch_size = 128
-n_epochs = 4.0
-n_epochs = int(np.ceil(n_epochs / hvd.size()))
+n_epochs = 1 # use 4.0 for paper epochs <set epochs here>
+n_epochs = int(n_epochs)
+# n_epochs = int(np.ceil(n_epochs / hvd.size()))
 
 # parameters
 n_steps = 28 # 28 rows aka Ni
